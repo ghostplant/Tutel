@@ -82,6 +82,7 @@ def create_groups_from_world(group_count, include_init=None, parent_group=None):
           if glob_world_rank == 0:
               print(*args)
     except ValueError:
+        assert int(os.environ.get('WORLD_SIZE', 1)) == 1, "Failed to initialize distributed session"
         glob_world_size, glob_world_rank, dist_local_rank = 1, 0, 0
         is_distributed = False
         dist_print = print
@@ -121,6 +122,8 @@ def create_groups_from_world(group_count, include_init=None, parent_group=None):
 
     result.global_size = glob_world_size
     result.global_rank = glob_world_rank
+    result.local_rank = dist_local_rank
+    result.local_size = int(os.environ.get('LOCAL_WORLD_SIZE', 1))
 
     result.group_count = dist_group_size
     result.data_rank = dist_group_rank
@@ -169,6 +172,13 @@ def create_groups_from_world(group_count, include_init=None, parent_group=None):
 
 def swap_axis(t, x, y):
     return t if x == y else t.swapaxes(x, y)
+
+def simple_broadcast(input, src=0, group=None):
+    world_size = get_world_size(group)
+    if world_size == 1:
+        return input
+    dist.broadcast(input, src=src, group=group)
+    return input
 
 def simple_all_reduce(input, group=None, op=torch.distributed.ReduceOp.SUM, inplace=False):
     world_size = get_world_size(group)
